@@ -1,0 +1,3 @@
+----
+Contents of example2.txt
+----

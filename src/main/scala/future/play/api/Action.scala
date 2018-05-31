@@ -13,18 +13,21 @@ trait Action {
 
 object Action {
 
-  def apply[T: Responder](block: Request.To[T]): Action = {
-    implicit request => Responder.responseFor(block)
+  def apply[T: Responder](block: Request.To[T]): Action = new Action {
+    def handle(request: Request): Future[Response] = {
+      implicit def r: Request = request
+      Responder.responseFor(block)
+    }
   }
 }
 
-// @implicitNotFound(
-//   "Cannot find an implicit Responder[${T}] to convert the return value into a valid Response.\n\n" +
-//   "Response and Future[Response] have standard implementations by default, but all other types require you " +
-//   "to write a custom Responder.\n\n" +
-//   "Either explicitly convert the ${T} into one of the types with standard implimentations " +
-//   "or define a custom responder for this type."
-// )
+@implicitNotFound(
+  "Cannot find an implicit Responder[${T}] to convert the return value into a valid Response.\n\n" +
+  "Response and Future[Response] have standard implementations by default, but all other types require you " +
+  "to write a custom Responder.\n\n" +
+  "Either explicitly convert the ${T} into one of the types with standard implimentations " +
+  "or define a custom responder for this type."
+)
 trait Responder[T] {
   def responseFor(value: T): Request.To[Future[Response]]
 }
@@ -35,11 +38,15 @@ object Responder {
     implicit req => responder.responseFor(value)
   }
 
-  implicit val responseResponder: Responder[Response] = {
-    response => implicit request => Future.successful(response)
+  implicit val responseResponder: Responder[Response] = new Responder[Response] {
+    override def responseFor(value: Response): Request.To[Future[Response]] = {
+      Future.successful(value)
+    }
   }
 
-  implicit val futureResponseResponder: Responder[Future[Response]] = {
-    future => implicit request => future
+  implicit val futureResponseResponder: Responder[Future[Response]] = new Responder[Future[Response]] {
+    override def responseFor(value: Future[Response]): Request.To[Future[Response]] = {
+      value
+    }
   }
 }

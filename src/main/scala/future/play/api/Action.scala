@@ -18,13 +18,13 @@ object Action {
   }
 }
 
-@implicitNotFound(
-  "Cannot find an implicit Responder[${T}] to convert the return value into a valid Response.\n\n" +
-  "Response and Future[Response] have standard implementations by default, but all other types require you " +
-  "to write a custom Responder.\n\n" +
-  "Either explicitly convert the ${T} into one of the types with standard implimentations " +
-  "or define a custom responder for this type."
-)
+// @implicitNotFound(
+//   "Cannot find an implicit Responder[${T}] to convert the return value into a valid Response.\n\n" +
+//   "Response and Future[Response] have standard implementations by default, but all other types require you " +
+//   "to write a custom Responder.\n\n" +
+//   "Either explicitly convert the ${T} into one of the types with standard implimentations " +
+//   "or define a custom responder for this type."
+// )
 trait Responder[T] {
   def responseFor(value: T): Request.To[Future[Response]]
 }
@@ -32,14 +32,14 @@ trait Responder[T] {
 object Responder {
 
   def responseFor[T](value: T)(implicit responder: Responder[T]): Request.To[Future[Response]] = {
-    responder.responseFor(value)
+    implicit req => responder.responseFor(value)
   }
 
   implicit val responseResponder: Responder[Response] = {
-    response => Future.successful(response)
+    response => implicit request => Future.successful(response)
   }
 
   implicit val futureResponseResponder: Responder[Future[Response]] = {
-    future => future
+    future => implicit request => future
   }
 }

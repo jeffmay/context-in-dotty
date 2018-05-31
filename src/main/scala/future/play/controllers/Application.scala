@@ -27,10 +27,10 @@ class Application(
     Future.successful(Response(200, "Simple Little Example"))
   }
 
-  def findUser(userId: Int): Action = Action.withContext[AuthCtx].asyncOr(Response(500)) {
+  def findUser(userId: Int): Action = Action.withContext[AuthCtx].async {
     service.findUser(userId).map { maybeUser: Option[User] =>
       logger.info(s"Found user called with $userId")
       maybeUser.map(user => Response(200, user.toString)).getOrElse(Response(404))
     }
-  }
+  } 
 }

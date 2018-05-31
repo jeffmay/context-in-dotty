@@ -9,6 +9,8 @@ import future.play.api.ActionContext.{FromRequestAsync, MaybeFromRequestAsync}
   */
 class ActionBuilder[Ctx] {
 
+  def withoutContext: ActionBuilder[Unit] = new ActionBuilder[Unit]
+
   def withContext[NewCtx]: ActionBuilder[NewCtx] = new ActionBuilder[NewCtx]
 
   def async[B: Responder](block: implicit (Ctx, Request) => B)(implicit extractor: FromRequestAsync[Ctx], ec: ExecutionContext): Action = {

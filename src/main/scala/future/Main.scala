@@ -23,7 +23,7 @@ object TestPlay {
     val sctx = SvcCtx(ExecuteOnCallingThread)
     val userSvc = new UserService(sctx)
     val roleSvc = new RoleService(sctx)
-    val cctx = CtrlCtx(new AppActionToolkit(roleSvc, userSvc), ExecuteOnCallingThread)
+    val cctx = CtrlCtx(new AppActionToolkit(roleSvc, userSvc, ExecuteOnCallingThread))
     val app = new Application(cctx, userSvc)
     val goodRequest = Request("GET", "/fake", "Good Request", Map("Authorization" -> "1"))
     val badRequest = Request("GET", "/fake")

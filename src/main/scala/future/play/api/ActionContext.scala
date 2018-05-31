@@ -69,12 +69,6 @@ object ActionContext {
     def respondToMissingContext(request: Request): Response
   }
 
-  object MissingFromRequest {
-    implicit def respondEmpty400[Ctx]: MissingFromRequest[Ctx] = {
-      _ => Response(400)
-    }
-  }
-
   /**
     * A simple function for extracting the context from the request or short-circuiting with
     * and early response.
@@ -120,5 +114,16 @@ object ActionContext {
   trait FromRequestAsync[Ctx] {
 
     def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]]
+  }
+
+  object FromRequestAsync {
+
+    implicit def missing[Ctx](implicit 
+      find: MaybeFromRequestAsync[Ctx],
+      orElse: MissingFromRequest[Ctx],
+      ec: ExecutionContext,
+    ): FromRequestAsync[Ctx] = { implicit request =>
+      find.extractOptAsync(Request.here).map(_.toRight(orElse.respondToMissingContext(request)))
+    }
   }
 }

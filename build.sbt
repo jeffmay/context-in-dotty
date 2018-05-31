@@ -1,8 +1,5 @@
-val dottyVersion = "0.7.0-RC1"
-
 name := "context-in-dotty"
-version := "0.1.0"
-
-scalaVersion := dottyVersion
+version := "0.2.0"
+scalaVersion := "0.8.0-RC1"
 
 libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % Test

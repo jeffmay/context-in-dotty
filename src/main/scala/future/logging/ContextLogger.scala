@@ -2,20 +2,22 @@ package future.logging
 
 abstract class ContextLogger[Ctx] {
 
-  protected def formatLog(level: String, msg: String)(implicit ctx: Ctx): String
+  protected def formatLogEntry(level: String, msg: String)(implicit ctx: Ctx): String
 
   def info(msg: String)(implicit ctx: Ctx): Unit = {
-    println(formatLog("INFO", msg))
+    println(formatLogEntry("INFO", msg))
   }
 
 }
 
-trait DefaultLoggingFormat[Ctx] {
+trait MDCLogFormat[Ctx] {
   self: ContextLogger[Ctx] =>
 
-  protected def formatContext(ctx: Ctx): String
+  protected def extractMDC(ctx: Ctx): Map[String, String]
 
-  override protected def formatLog(level: String, msg: String)(implicit ctx: Ctx): String = {
-    s"${level}: $msg [${formatContext(ctx)}]"
+  protected def formatMDC(fields: Map[String, String]): String = fields.map { case (k, v) => s"$k=$v" }.mkString(", ")
+
+  override protected def formatLogEntry(level: String, msg: String)(implicit ctx: Ctx): String = {
+    s"${level}: $msg [${formatMDC(extractMDC(ctx))}]"
   }
 }

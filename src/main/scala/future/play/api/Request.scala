@@ -9,4 +9,6 @@ case class Request(method: String, path: String, body: String = "", headers: Map
 
 object Request {
   inline def here(implicit request: Request): Request = request
+
+  type To[T] = implicit Request => T
 }

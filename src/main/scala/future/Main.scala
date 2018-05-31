@@ -21,9 +21,11 @@ object Main {
 object TestPlay {
   def run(): Unit = {
     val sctx = SvcCtx(ExecuteOnCallingThread)
-    val cctx = CtrlCtx(new AppActionToolkit(new RoleService(sctx)), ExecuteOnCallingThread)
-    val app = new Application(cctx, new UserService(sctx))
-    val goodRequest = Request("GET", "/fake", "Good Request", Map("Authorization" -> "secret"))
+    val userSvc = new UserService(sctx)
+    val roleSvc = new RoleService(sctx)
+    val cctx = CtrlCtx(new AppActionToolkit(roleSvc, userSvc), ExecuteOnCallingThread)
+    val app = new Application(cctx, userSvc)
+    val goodRequest = Request("GET", "/fake", "Good Request", Map("Authorization" -> "1"))
     val badRequest = Request("GET", "/fake")
     val example = app.example.handle(badRequest).!
     println(s"Expected 200 (example): ${example.status}")

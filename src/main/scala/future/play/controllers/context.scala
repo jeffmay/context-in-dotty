@@ -1,21 +1,27 @@
 package future.play.controllers
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 import future.concurrent.ImplicitExecutionContext
 import future.play.api.{ActionContext, ActionToolkit, Request, Response}
 import future.play.models._
-import future.play.services.RoleService
+import future.play.services.{RoleService, UserService}
 
 case class CtrlCtx(
   actionToolkit: AppActionToolkit,
-  executionContext: ExecutionContext
+  executionContext: ExecutionContext,
 )
 
-class AppActionToolkit(roleService: RoleService) extends ActionToolkit[AppCtx] {
+class AppActionToolkit(
+  roleService: RoleService,
+  userService: UserService,
+) extends ActionToolkit[AppCtx] {
 
   /**
-    * Extract the [[AppCtx]] from the headers.
+    * Extract the [[CorrelationId]] from the headers.
+    *
+    * NOTE: This is just for demo purposes, we wouldn't need this since we can always use [[UnAuthCtx]]
     */
   implicit lazy val correlationIdFromRequest: ActionContext.FromRequest[CorrelationId] = ActionContext.fromRequest {
     Right(CorrelationId.extractFromHeaderMap(Request.here.headers))
@@ -26,21 +32,35 @@ class AppActionToolkit(roleService: RoleService) extends ActionToolkit[AppCtx] {
   }
 
   /**
-    * Extract the [[AppCtx]] from the headers.
+    * Extract the [[UnAuthCtx]] from the headers.
     */
   implicit lazy val unAuthCtxFromRequest: ActionContext.FromRequest[UnAuthCtx] = ActionContext.fromRequest {
     Right(extractUnAuthContext(Request.here))
   }
 
   /**
-    * Extract the [[AppCtx]] from the headers or let the controller / action handle the failure.
+    * Extract the [[AuthCtx]] from the headers or let the controller / action handle the failure.
     */
-  implicit lazy val authCtxFromRequest: ActionContext.MaybeFromRequest[AuthCtx] = ActionContext.maybeFromRequest { implicit request =>
-    request.headers.get("Authorization") map { authToken =>
-      implicit val ctx = extractUnAuthContext(request)
-      val rolesFromToken = Set(Role("member"))
-      val perms = roleService.expandRoles(rolesFromToken)
-      AuthCtx(request, ctx.correlationId, Authorization(rolesFromToken, perms))
+  implicit def authCtxFromRequest(implicit ec: ExecutionContext): ActionContext.MaybeFromRequestAsync[AuthCtx] = {
+    ActionContext.maybeFromRequestAsync { implicit request =>
+      val maybeUserId = for {
+        authToken <- request.headers.get("Authorization")
+        userId <- Try(authToken.toInt).toOption
+      } yield userId
+      maybeUserId match {
+        case Some(userId) =>
+          implicit val ctx = extractUnAuthContext(request)
+          userService.findUser(userId) flatMap {
+            case Some(user) =>
+              roleService.expandRoles(user.roles) map { perms =>
+                Some(AuthCtx(request, ctx.correlationId, Authorization(user.roles, perms)))
+              }
+            case None =>
+              Future.successful(None)
+          }
+        case None =>
+          Future.successful(None)
+      }
     }
   }
 
@@ -51,15 +71,14 @@ class AppActionToolkit(roleService: RoleService) extends ActionToolkit[AppCtx] {
     Response(401, s"Unauthorized request to ${Request.here}")
   }
 
-  private def extractAppCtx(request: Request): AppCtx = {
-    authCtxFromRequest.extractOpt(request) getOrElse extractUnAuthContext(request)
-  }
-
   /**
     * Extract the [[AppCtx]] from the headers.
     */
-  implicit lazy val appCtxFromRequest: ActionContext.FromRequest[AppCtx] = ActionContext.fromRequest { implicit request =>
-    Right(extractAppCtx(request))
+  implicit def appCtxFromRequest(implicit ec: ExecutionContext): ActionContext.FromRequestAsync[AppCtx] = {
+    ActionContext.fromRequestAsync { implicit request =>
+      authCtxFromRequest.extractOptAsync(request)
+        .map(maybeCtx => Right(maybeCtx.getOrElse(extractUnAuthContext(request))))
+    }
   }
 }
 

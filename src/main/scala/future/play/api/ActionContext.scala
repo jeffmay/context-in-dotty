@@ -1,6 +1,8 @@
 package future.play.api
 
 import scala.annotation.implicitNotFound
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 object ActionContext {
 
@@ -12,7 +14,11 @@ object ActionContext {
     extractor.extractOrRespond(request)
   }
 
-  def fromRequest[Ctx](parse: ImplicitFunction1[Request, Either[Response, Ctx]]): FromRequest[Ctx] = {
+  def fromRequest[Ctx](parse: implicit Request => Either[Response, Ctx]): FromRequest[Ctx] = {
+    implicit request => parse
+  }
+
+  def fromRequestAsync[Ctx](parse: implicit Request => Future[Either[Response, Ctx]]): FromRequestAsync[Ctx] = {
     implicit request => parse
   }
 
@@ -20,13 +26,22 @@ object ActionContext {
     implicit request => parse
   }
 
-  def missingFromRequest[Ctx](respond: ImplicitFunction1[Request, Response]): MissingFromRequest[Ctx] = {
+  def maybeFromRequestAsync[Ctx](parse: implicit Request => Future[Option[Ctx]]): MaybeFromRequestAsync[Ctx] = {
+    implicit request => parse
+  }
+
+  def missingFromRequest[Ctx](respond: implicit Request => Response): MissingFromRequest[Ctx] = {
     implicit request => respond
   }
 
-  def maybeFromRequestOrElse[Ctx](respond: ImplicitFunction1[Request, Response])
+  def maybeFromRequestOrElse[Ctx](respond: implicit Request => Response)
     (implicit extractor: MaybeFromRequest[Ctx]): FromRequest[Ctx] = {
     request => extractor.extractOpt(request).toRight(respond(request))
+  }
+
+  def maybeFromRequestAsyncOrElse[Ctx](respond: implicit Request => Response)
+    (implicit extractor: MaybeFromRequestAsync[Ctx], ec: ExecutionContext): FromRequestAsync[Ctx] = {
+    request => extractor.extractOptAsync(request).map(_.toRight(respond(request)))
   }
 
   /**
@@ -38,6 +53,10 @@ object ActionContext {
     */
   trait MaybeFromRequest[Ctx] {
     def extractOpt(request: Request): Option[Ctx]
+  }
+
+  trait MaybeFromRequestAsync[Ctx] {
+    def extractOptAsync(request: Request): Future[Option[Ctx]]
   }
 
   /**
@@ -64,10 +83,14 @@ object ActionContext {
     */
   @implicitNotFound("Cannot find implicit FromRequest[${Ctx}] in scope. " +
     "This can be automatically built if there is both an implicit " +
-    "MaybeFromRequest[${Ctx}] and FromRequest.FailedHandler[${Ctx}] in scope.")
-  trait FromRequest[Ctx] {
+    "MaybeFromRequest[${Ctx}] and MissingFromRequest[${Ctx}] in scope.")
+  trait FromRequest[Ctx] extends FromRequestAsync[Ctx] {
 
     def extractOrRespond(request: Request): Either[Response, Ctx]
+
+    override def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]] = {
+      Future.fromTry(Try(extractOrRespond(request)))
+    }
   }
 
   object FromRequest {
@@ -83,6 +106,19 @@ object ActionContext {
       request => Right(extractor.extractOpt(request))
     }
   }
-}
 
-// TODO: AsyncFromRequest
+  /**
+    * TODO: Better message
+    * A simple function for extracting the context from the request or short-circuiting with
+    * and early response.
+    *
+    * @tparam Ctx the type of context to extract from the request.
+    */
+  @implicitNotFound("Cannot find implicit FromRequestAsync[${Ctx}] in scope. " +
+    "This can be automatically built if there is both an implicit " +
+    "MaybeFromRequestAsync[${Ctx}] and MissingFromRequest[${Ctx}] in scope.")
+  trait FromRequestAsync[Ctx] {
+
+    def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]]
+  }
+}

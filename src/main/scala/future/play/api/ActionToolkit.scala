@@ -12,7 +12,7 @@ class ActionToolkit[Ctx] {
 
   implicit def extractCtxOrDefaultResponse(implicit
     extractCtx: ActionContext.MaybeFromRequest[Ctx],
-    failedHandler: ActionContext.MissingFromRequest[Ctx]
+    failedHandler: ActionContext.MissingFromRequest[Ctx],
   ): ActionContext.FromRequest[Ctx] = {
     request => extractCtx.extractOpt(request).toRight(failedHandler.respondToMissingContext(request))
   }

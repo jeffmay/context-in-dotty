@@ -7,7 +7,4 @@ import future.concurrent.ImplicitExecutionContext
 case class SvcCtx(executionContext: ExecutionContext)
 
 abstract class BaseService(sctx: SvcCtx)
-  extends ImplicitExecutionContext(sctx.executionContext) {
-
-
-}
+  extends ImplicitExecutionContext(sctx.executionContext)

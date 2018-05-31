@@ -4,11 +4,12 @@ import future.os.OS
 import future.os.OS.OpensFile
 import future.play.controllers._
 
+
 object Main {
 
   def main(args: Array[String]): Unit = {
     println("Hello world!")
-    TestOS.run()
+//    TestOS.run()
     TestPlay.run()
   }
 
@@ -25,7 +26,7 @@ object TestOS {
     }
 
     // not safe to open files outside of the effect safe-zone
-    // OS.openResource(Paths.get("example.txt")) // compile error
+//     OS.openResource(Paths.get("example.txt")) // compile error
   }
 
   def functionThatOpensResources()(implicit effect: OpensFile): Unit = {
@@ -46,6 +47,8 @@ object TestPlay {
     println(exampleGood)
     val exampleBad = app.example.handle(badRequest).getOrThrow
     println(exampleBad)
+
+
     val findUserGood = app.findUser(1).handle(goodRequest).getOrThrow
     println(findUserGood)
     val userNotFound = app.findUser(0).handle(goodRequest).getOrThrow

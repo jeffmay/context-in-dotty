@@ -1,6 +1,10 @@
 ### IDEA
 .idea/
 
+### VSCode
+.dotty-ide-artifact
+.dotty-ide.json
+
 ### Scala template
 *.class
 *.log

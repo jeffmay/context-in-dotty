@@ -2,43 +2,43 @@ package future.play.api
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import future.play.api.ActionContext.{FromRequestAsync, MaybeFromRequestAsync}
+import future.context.ContextCompanion
+import future.concurrent.ImplicitExecutionContext
 
-/**
-  * A sample of how Play's ActionBuilder could look if it was context-aware.
-  */
-class ActionBuilder[Ctx] {
+object ActionBuilder {
 
-  def withoutContext: ActionBuilder[Unit] = new ActionBuilder[Unit]
+  def apply(executionContext: ExecutionContext): ActionBuilder[PlayRequestContext] = {
+    implicit def ec: ExecutionContext = executionContext
+    new ActionBuilder[PlayRequestContext]
+  }
+}
 
-  def withContext[NewCtx]: ActionBuilder[NewCtx] = new ActionBuilder[NewCtx]
+class ActionBuilder[BaseCtx](implicit 
+  refiner: ContextRefiner[PlayRequestContext, BaseCtx],
+  handlerContext: ExecutionContext
+) extends ImplicitExecutionContext(handlerContext) {
+  outer =>
 
-  def async[B: Responder](block: implicit (Ctx, Request) => B)(implicit extractor: FromRequestAsync[Ctx], ec: ExecutionContext): Action = {
-    Action { implicit request =>
-      extractor.extractOrRespondAsync(request) flatMap {
-        case Right(ctx) =>
-          Responder.responseFor(block(ctx, request))
-        case Left(rsp) =>
-          Future.successful(rsp)
-      }
+  def handle[R](block: implicit BaseCtx => R)(implicit responder: Responder[R]): Action = { request =>
+    // TODO: How to include server context?
+    implicit val playCtx: PlayRequestContext = new PlayRequestContext(request) {}
+    refiner.refineOrRespond().flatMap {
+      case Right(ctx) =>
+        implicit def c: BaseCtx = ctx
+        responder.responseFor(block)
+      case Left(rsp) =>
+        Future.successful(rsp)
     }
   }
 
-  def asyncOr[E: Responder, B: Responder](
-    earlyResponse: E
-  )(
-    block: implicit (Ctx, Request) => B
-  )(implicit 
-    extractor: MaybeFromRequestAsync[Ctx], 
-    ec: ExecutionContext
-  ): Action = {
-    Action { implicit request =>
-      extractor.extractOptAsync(request) flatMap {
-        case Some(ctx) =>
-          Responder.responseFor(block(ctx, request))
-        case None =>
-          Responder.responseFor(earlyResponse)
+  def refined[C](implicit refiner: ContextRefiner[BaseCtx, C]): ActionBuilder[C] = {
+    new ActionBuilder[C]()({ implicit playCtx =>
+      outer.refiner(playCtx).flatMap {
+        case Right(base) =>
+          refiner(base)
+        case Left(response) =>
+          Future.successful(Left(response))
       }
-    }
+    }, handlerContext)
   }
 }

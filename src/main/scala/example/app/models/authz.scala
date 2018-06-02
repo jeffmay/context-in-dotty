@@ -1,8 +1,11 @@
-package future.play.models
+package example.app.models
 
-import future.play.services.RoleService
+import future.play.json._
 
 case class Role(name: String) extends AnyVal
+object Role {
+  implicit val writesRole: Writes[Role] = role => JsValue.JsString(role.name)
+}
 
 case class Permission(name: String) extends AnyVal
 

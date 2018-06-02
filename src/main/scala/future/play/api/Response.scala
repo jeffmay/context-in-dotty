@@ -1,6 +1,6 @@
 package future.play.api
 
 /**
-  * A dumb response model
+  * A simple response model
   */
 case class Response(status: Int, body: String = "", headers: Map[String, String] = Map.empty)

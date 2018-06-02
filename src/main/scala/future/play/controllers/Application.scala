@@ -3,7 +3,7 @@ package future.play.controllers
 import scala.annotation.implicitNotFound
 import scala.concurrent.{ExecutionContext, Future}
 
-import future.concurrent.ImplicitExecutionContext
+import future.concurrent.{ExecuteOnCallingThread, ImplicitExecutionContext}
 import future.play.api._
 import future.play.models.User
 import future.play.services.UserService
@@ -27,10 +27,31 @@ class Application(
     Future.successful(Response(200, "Simple Little Example"))
   }
 
-  def findUser(userId: Int): Action = Action.withContext[AuthCtx].async {
+  def findUser(userId: Int): Action = Action.withContext[AuthCtx].asyncOr(Response(500)) {
     service.findUser(userId).map { maybeUser: Option[User] =>
       logger.info(s"Found user called with $userId")
       maybeUser.map(user => Response(200, user.toString)).getOrElse(Response(404))
     }
-  } 
+  }
+}
+
+object Example {
+  import future.play.models.CorrelationId
+  implicit def ec: ExecutionContext = ExecuteOnCallingThread
+
+  import ActionToolkit._
+
+  /**
+    * Extract the [[CorrelationId]] from the headers.
+    *
+    * NOTE: This is just for demo purposes, we wouldn't need this since we can always use [[UnAuthCtx]]
+    */
+  implicit lazy val correlationIdFromRequest: ActionContext.FromRequest[CorrelationId] = ActionContext.fromRequest {
+    Right(CorrelationId.extractFromHeaderMap(Request.here.headers))
+  }
+
+  // Action.withContext[CorrelationId].async {
+  //   println(CorrelationId.here)
+  //   Response(200)
+  // }
 }

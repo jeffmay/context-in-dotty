@@ -39,14 +39,10 @@ object Responder {
   }
 
   implicit val responseResponder: Responder[Response] = new Responder[Response] {
-    override def responseFor(value: Response): Request.To[Future[Response]] = {
-      Future.successful(value)
-    }
+    override def responseFor(value: Response): Request.To[Future[Response]] = Future.successful(value)
   }
 
   implicit val futureResponseResponder: Responder[Future[Response]] = new Responder[Future[Response]] {
-    override def responseFor(value: Future[Response]): Request.To[Future[Response]] = {
-      value
-    }
+    override def responseFor(value: Future[Response]): Request.To[Future[Response]] = value
   }
 }

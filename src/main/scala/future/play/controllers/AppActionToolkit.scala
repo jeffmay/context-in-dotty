@@ -4,7 +4,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 import future.concurrent.ImplicitExecutionContext
-import future.play.api.{AB, ActionContext, ActionToolkit, Request, Response}
+import future.play.api.{AB, AB1, ActionContext, ActionToolkit, Request, Response}
 import future.play.models._
 import future.play.services.{RoleService, UserService}
 
@@ -12,7 +12,7 @@ class AppActionToolkit(
   roleService: RoleService,
   userService: UserService,
   implicit val ctxFromRequestExecutionContext: ExecutionContext,
-) extends ActionToolkit[(Request, AppCtx)](AB[AppCtx]) {
+) extends ActionToolkit[AB1[AppCtx]](AB.withContext[AppCtx]) {
 
   /**
     * Extract the [[CorrelationId]] from the headers.

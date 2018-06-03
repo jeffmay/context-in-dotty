@@ -1,6 +1,7 @@
 package future.play.api
 
-import future.implicits.ImplicitTupleItems
+// import future.implicits.ImplicitTupleItems
+import future.play.api._
 import future.play.api.ActionContext
 import future.play.api.ActionContext.FromRequest
 
@@ -9,7 +10,7 @@ import future.play.api.ActionContext.FromRequest
   *
   * @tparam Ctx the type of context to extract for all actions
   */
-class ActionToolkit[Ctx](root: AB[Ctx]) extends ImplicitTupleItems {
+abstract class ActionToolkit[A <: AB[_]](val Action: A) {
 
   // implicit def extractCtxOrDefaultResponse(implicit
   //   extractCtx: ActionContext.MaybeFromRequest[Ctx],
@@ -17,10 +18,8 @@ class ActionToolkit[Ctx](root: AB[Ctx]) extends ImplicitTupleItems {
   // ): ActionContext.FromRequest[Ctx] = {
   //   request => extractCtx.extractOpt(request).toRight(failedHandler.respondToMissingContext(request))
   // }
-
-  def Action: AB[Ctx] = root
 }
 
-final object ActionToolkit extends ActionToolkit[Request](AB) {
-  type Untyped = ActionToolkit[Request]
+final object ActionToolkit extends ActionToolkit[AB.type](AB) {
+  type Untyped = ActionToolkit[AB.type]
 }

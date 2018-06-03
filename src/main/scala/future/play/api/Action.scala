@@ -13,10 +13,10 @@ trait Action {
 
 object Action {
 
-  def apply[T: Responder](block: Request.To[T]): Action = new Action {
+  def apply(block: Request.To[Result]): Action = new Action {
     def handle(request: Request): Future[Response] = {
       implicit def r: Request = request
-      Responder.responseFor(block)
+      block.result
     }
   }
 }
@@ -44,5 +44,15 @@ object Responder {
 
   implicit val futureResponseResponder: Responder[Future[Response]] = new Responder[Future[Response]] {
     override def responseFor(value: Future[Response]): Request.To[Future[Response]] = value
+  }
+}
+
+case class Result(result: Future[Response]) extends AnyVal
+  
+object Result {
+  import scala.language.implicitConversions
+
+  implicit def fromResponder[T: Responder](value: T)(implicit req: Request): Result = {
+    Result(Responder.responseFor(value))
   }
 }

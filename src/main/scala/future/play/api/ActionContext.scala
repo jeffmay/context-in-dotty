@@ -1,8 +1,11 @@
 package future.play.api
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.annotation.implicitNotFound
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.collection
+import scala.util.{Success, Try}
 
 object ActionContext {
 
@@ -26,8 +29,24 @@ object ActionContext {
     implicit request => parse
   }
 
+  def maybeFromRequestOrElse[Ctx](orElse: implicit Request => Response)
+    (implicit extractor: MaybeFromRequest[Ctx]): FromRequest[Ctx] = {
+    implicit request => extractor.extractOpt(request) match {
+      case Some(ctx) => Right(ctx)
+      case _ => Left(orElse)
+    }
+  }
+
   def fromRequestAsync[Ctx](parse: implicit Request => Future[Either[Response, Ctx]]): FromRequestAsync[Ctx] = {
     implicit request => parse
+  }
+
+  def maybeFromRequestAsyncOrElse[Ctx](orElse: implicit Request => Response)
+    (implicit extractor: MaybeFromRequestAsync[Ctx], ec: ExecutionContext): FromRequestAsync[Ctx] = {
+    implicit request => extractor.extractOptAsync(request).map {
+      case Some(ctx) => Right(ctx)
+      case _ => Left(orElse)
+    }
   }
 
   def maybeFromRequest[Ctx](parse: implicit Request => Option[Ctx]): MaybeFromRequest[Ctx] = {
@@ -42,16 +61,6 @@ object ActionContext {
     implicit request => respond
   }
 
-  def maybeFromRequestOrElse[Ctx](respond: implicit Request => Response)
-    (implicit extractor: MaybeFromRequest[Ctx]): FromRequest[Ctx] = {
-    request => extractor.extractOpt(request).toRight(respond(request))
-  }
-
-  def maybeFromRequestAsyncOrElse[Ctx](respond: implicit Request => Response)
-    (implicit extractor: MaybeFromRequestAsync[Ctx], ec: ExecutionContext): FromRequestAsync[Ctx] = {
-    request => extractor.extractOptAsync(request).map(_.toRight(respond(request)))
-  }
-
   /**
     * A simple function for optionally extracting the context.
     *
@@ -59,17 +68,74 @@ object ActionContext {
     *
     * @tparam Ctx the type of context to extract from the request.
     */
-  trait MaybeFromRequest[Ctx] extends MaybeFromRequestAsync[Ctx] {
-    
+  trait MaybeFromRequest[Ctx] {
     def extractOpt(request: Request): Option[Ctx]
+  }
 
-    override def extractOptAsync(request: Request): Future[Option[Ctx]] = {
-      Future.fromTry(Try(extractOpt(request)))
+  object MaybeFromRequest {
+
+    implicit def requestMaybeFromRequest: MaybeFromRequest[Request] = {
+      request => Some(request)
     }
   }
 
   trait MaybeFromRequestAsync[Ctx] {
     def extractOptAsync(request: Request): Future[Option[Ctx]]
+  }
+
+  object MaybeFromRequestAsync {
+
+    implicit def maybeFromRequestSyncAsAsync[Ctx: MaybeFromRequest]: MaybeFromRequestAsync[Ctx] = {
+      new MaybeFromRequestAsync[Ctx] {
+        override def extractOptAsync(request: Request): Future[Option[Ctx]] = {
+          implicit def req: Request = request
+          Future.fromTry(Try(extractOpt[Ctx]))
+        }
+      }
+    }
+
+    // Folds the thunks into the first early response or an array of the accumulated results
+    private def squash[T](
+      thunks: Seq[() => Future[Option[Any]]],
+    )(
+      gather: PartialFunction[Array[Any], T],
+    )(implicit ec: ExecutionContext): Future[Option[T]] = {
+      val acc = new Array[Any](thunks.size)
+      var squashed: Future[Option[Array[Any]]] = Future.successful(Some(acc))
+      for ((result, i) <- thunks.zipWithIndex) {
+        squashed = result().map(_.map { x =>
+          acc(i) = x
+          acc
+        })
+      }
+      squashed.map(_.map(gather))
+    }
+
+    implicit def maybeFromRequestAsync2[
+      A: MaybeFromRequestAsync,
+      B: MaybeFromRequestAsync,
+    ](implicit ec: ExecutionContext): MaybeFromRequestAsync[(A, B)] = { implicit request =>
+      squash(Seq(
+        () => extractOptAsync[A],
+        () => extractOptAsync[B],
+      )) {
+        case Array(a, b) => (a, b).asInstanceOf[(A, B)]
+      }
+    }
+
+    implicit def fromRequest3[
+      A: MaybeFromRequestAsync,
+      B: MaybeFromRequestAsync,
+      C: MaybeFromRequestAsync,
+    ](implicit ec: ExecutionContext): MaybeFromRequestAsync[(A, B, C)] = { implicit request =>
+      squash(Seq(
+        () => extractOptAsync[A],
+        () => extractOptAsync[B],
+        () => extractOptAsync[C],
+      )) {
+        case Array(a, b, c) => (a, b, c).asInstanceOf[(A, B, C)]
+      }
+    }
   }
 
   /**
@@ -91,13 +157,9 @@ object ActionContext {
   @implicitNotFound("Cannot find implicit FromRequest[${Ctx}] in scope. " +
     "This can be automatically built if there is both an implicit " +
     "MaybeFromRequest[${Ctx}] and MissingFromRequest[${Ctx}] in scope.")
-  trait FromRequest[Ctx] extends FromRequestAsync[Ctx] {
+  trait FromRequest[Ctx] { // extends FromRequestAsync[Ctx] {
 
     def extractOrRespond(request: Request): Either[Response, Ctx]
-
-    override def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]] = {
-      Future.fromTry(Try(extractOrRespond(request)))
-    }
   }
 
   object FromRequest {
@@ -105,8 +167,8 @@ object ActionContext {
     /**
       * A default for use by [[ActionBuilder.Untyped]]
       */
-    implicit lazy val requestFromRequest: FromRequest[Request] = new FromRequest[Request] {
-      override def extractOrRespond(request: Request): Either[Response, Request] = Right(request)
+    implicit lazy val requestFromRequest: FromRequest[Request] = {
+      request => Right(request)
     }
 
     implicit def extractCtxOrDefaultResponse[Ctx](implicit
@@ -137,72 +199,72 @@ object ActionContext {
   @implicitNotFound("Cannot find implicit FromRequestAsync[${Ctx}] in scope. " +
     "This can be automatically built if there is both an implicit " +
     "MaybeFromRequestAsync[${Ctx}] and MissingFromRequest[${Ctx}] in scope.")
-  trait FromRequestAsync[Ctx] extends MaybeFromRequestAsync[Ctx] {
-
-    def extractOptAsync(request: Request): Future[Option[Ctx]] = {
-      extractOrRespondAsync(request).transform(_.map(_.right.toOption))
-    }
-
+  trait FromRequestAsync[Ctx] {
     def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]]
   }
 
   object FromRequestAsync {
 
-    def extract[Ctx](request: Request)(implicit fromRequest: FromRequestAsync[Ctx]): Future[Either[Response, Ctx]] = {
-      fromRequest.extractOrRespondAsync(request)
+    implicit def fromRequestSyncAsAsync[Ctx: FromRequest]: FromRequestAsync[Ctx] = new FromRequestAsync[Ctx] {
+      override def extractOrRespondAsync(request: Request): Future[Either[Response, Ctx]] = {
+        implicit def req: Request = request
+        Future.fromTry(Try(extractOrRespond[Ctx]))
+      }
     }
 
-    implicit def missing[Ctx](implicit 
+    implicit def extractCtxOrDefaultResponseAsync[Ctx](implicit 
       find: MaybeFromRequestAsync[Ctx],
       orElse: MissingFromRequest[Ctx],
       ec: ExecutionContext,
     ): FromRequestAsync[Ctx] = { implicit request =>
-      find.extractOptAsync(Request.here).map(_.toRight(orElse.respondToMissingContext(request)))
+      find.extractOptAsync(request).map(_.toRight(orElse.respondToMissingContext(request)))
     }
 
-    private def squash(computeStream: Stream[Future[Either[Response, Any]]]): implicit ExecutionContext => Future[Either[Response, List[Any]]] = {
-      var squashed: Future[Either[Response, List[Any]]] = Future.successful(Right(Nil))
-      for (result <- computeStream) {
+    // Folds the futures into the first early response or an array of the accumlated results
+    private def squash[T](
+      thunks: Seq[() => Future[Either[Response, Any]]]
+    )(
+      gather: PartialFunction[Array[Any], T]
+    )(implicit ec: ExecutionContext): Future[Either[Response, T]] = {
+      val acc = new Array[Any](thunks.size)
+      var squashed: Future[Either[Response, Array[Any]]] = Future.successful(Right(acc))
+      for ((result, i) <- thunks.zipWithIndex) {
         squashed = squashed.flatMap { 
           case Left(resp) => Future.successful(Left(resp))
           case Right(acc) =>
-            result.transform(_.map {
-              case Left(resp) => Left(resp)
-              case Right(x) => Right(x :: acc)
+            result().map(_.right.map { x =>
+              acc(i) = x
+              acc
             })
         }
       }
-      squashed
+      squashed.map(_.right.map(gather))
     }
 
     implicit def fromRequestAsync2[
       A: FromRequestAsync,
       B: FromRequestAsync,
-    ](implicit ec: ExecutionContext): FromRequestAsync[(A, B)] = { request =>
-      val squashed = squash(Stream(
-        FromRequestAsync.extract[A](request),
-        FromRequestAsync.extract[B](request),
-      ))
-      squashed.transform(_.map(_.right.map {
-        case List(b, a) => (a, b).asInstanceOf[(A, B)]
-        case _ => ???
-      }))
+    ](implicit ec: ExecutionContext): FromRequestAsync[(A, B)] = { implicit request =>
+      squash(Seq(
+        () => extractOrRespondAsync[A],
+        () => extractOrRespondAsync[B],
+      )) {
+        case Array(a, b) => (a, b).asInstanceOf[(A, B)]
+      }
     }
 
     implicit def fromRequestAsync3[
       A: FromRequestAsync,
       B: FromRequestAsync,
       C: FromRequestAsync,
-    ](implicit ec: ExecutionContext): FromRequestAsync[(A, B, C)] = { request =>
-      val squashed = squash(Stream(
-        FromRequestAsync.extract[A](request),
-        FromRequestAsync.extract[B](request),
-        FromRequestAsync.extract[C](request),
-      ))
-      squashed.transform(_.map(_.right.map {
-        case List(c, b, a) => (a, b, c).asInstanceOf[(A, B, C)]
-        case _ => ???
-      }))
+    ](implicit ec: ExecutionContext): FromRequestAsync[(A, B, C)] = { implicit request =>
+      squash(Seq(
+        () => extractOrRespondAsync[A],
+        () => extractOrRespondAsync[B],
+        () => extractOrRespondAsync[C],
+      )) {
+        case Array(a, b, c) => (a, b, c).asInstanceOf[(A, B, C)]
+      }
     }
   }
 }

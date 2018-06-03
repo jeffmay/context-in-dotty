@@ -17,17 +17,22 @@ class Application(
 ) extends BaseController(cctx) {
   import cctx.actionToolkit._
 
-  def echoCorrelationId: Action = Action.withContext[CorrelationId].async {
+  def echoCorrelationId: Action = Action.withContext[CorrelationId].handle { implicit (a, b) =>
     println(CorrelationId.here)
     Future.successful(Response(200))
   }
 
-  def example: Action = Action.async {
+  def example: Action = Action.handle {
     logger.info("Received request to Application.example")
     Future.successful(Response(200, "Simple Little Example"))
   }
 
-  def findUser(userId: Int): Action = Action.withContext[AuthCtx].asyncOr(Response(500)) {
+  def example2: Action = Action.handle {
+    logger.info("Received request to Application.example")
+    Response(200, "Simple Little Example")
+  }
+
+  def findUser(userId: Int): Action = Action.withContext[AuthCtx].handleOr(Response(500)) {
     service.findUser(userId).map { maybeUser: Option[User] =>
       logger.info(s"Found user called with $userId")
       maybeUser.map(user => Response(200, user.toString)).getOrElse(Response(404))

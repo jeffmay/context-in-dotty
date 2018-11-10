@@ -5,7 +5,7 @@ import example.app.logging.AppLogger
 import example.app.services.UserService
 
 import future.concurrent.{ImplicitExecutionContext}
-import future.play.api.{ActionBuilder, Responder, Response}
+import future.play.api._
 import future.play.json._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -27,7 +27,7 @@ class ExampleController(
   }
 
   def returnOk = action.handle {
-    Responder.responseFor(Response(200))
+    Response(200)
   }
 
   def authenticated = action.refined[AuthCtx].handle {

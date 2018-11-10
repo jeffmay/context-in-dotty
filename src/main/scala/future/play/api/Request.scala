@@ -10,5 +10,5 @@ case class Request(method: String, path: String, body: String = "", headers: Map
 }
 
 object Request extends ContextCompanion[Request] {
-  inline def fromContext(implicit playContext: PlayRequestContext): Request = playContext.request
+  inline implicit def fromContext(implicit playContext: PlayRequestContext): Request = playContext.request
 }

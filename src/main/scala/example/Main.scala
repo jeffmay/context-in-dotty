@@ -1,4 +1,4 @@
-package example.app
+package example
 
 import java.nio.file.Paths
 

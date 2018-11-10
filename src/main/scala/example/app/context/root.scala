@@ -22,7 +22,7 @@ class RootCtxFromRequest(req: Request)
   override lazy val maybeUserId: Option[Int] = request.headers.get("UserId").flatMap(v => Try(v.toInt).toOption)
 }
 
-sealed trait RootCtx extends TraceCtx {
+sealed trait RootCtx extends PlayRequestContext with TraceCtx {
   def request: Request
 }
 

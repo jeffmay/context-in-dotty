@@ -19,13 +19,12 @@ class ActionBuilder[BaseCtx](implicit
 ) extends ImplicitExecutionContext(handlerContext) {
   outer =>
 
-  def handle[R](block: implicit BaseCtx => R)(implicit responder: Responder[R]): Action = { request =>
-    // TODO: How to include server context?
+  def handle[R: Responder](block: implicit BaseCtx => R): Action = { request =>
     implicit val playCtx: PlayRequestContext = new PlayRequestContext(request) {}
     refiner.refineOrRespond().flatMap {
       case Right(ctx) =>
         implicit def c: BaseCtx = ctx
-        responder.responseFor(block)
+        Responder.responseFor(block)
       case Left(rsp) =>
         Future.successful(rsp)
     }

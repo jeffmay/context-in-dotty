@@ -38,7 +38,7 @@ object RootCtx extends RequestContextCompanion[RootCtx] {
   "Missing implicit AuthCtx here. This model is extracted from the request by the controller " +
   "and passed along implicitly. Please include or define an implicit context in scope."
 )
-sealed trait AuthCtx extends RootCtx with DBCtx with TraceCtx {
+sealed trait AuthCtx extends RootCtx with DBCtx {
   def authenticatedUserId: Int
 }
 

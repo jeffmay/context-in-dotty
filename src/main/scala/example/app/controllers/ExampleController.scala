@@ -27,6 +27,7 @@ class ExampleController(
   }
 
   def returnOk = action.handle {
+    println(s"${Request.here.path} called")
     Response(200)
   }
 

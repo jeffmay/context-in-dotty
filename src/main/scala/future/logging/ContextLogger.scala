@@ -1,6 +1,8 @@
 package future.logging
 
-abstract class ContextLogger[Ctx] {
+import scala.reflect.ClassTag
+
+abstract class ContextLogger[Ctx](val name: String) {
 
   protected def formatLogEntry(level: String, msg: String)(implicit ctx: Ctx): String
 
@@ -18,6 +20,19 @@ trait MDCLogFormat[Ctx] {
   protected def formatMDC(fields: Map[String, String]): String = fields.map { case (k, v) => s"$k=$v" }.mkString(", ")
 
   override protected def formatLogEntry(level: String, msg: String)(implicit ctx: Ctx): String = {
-    s"${level}: $msg [${formatMDC(extractMDC(ctx))}]"
+    s"[${level}] ${name}: $msg [${formatMDC(extractMDC(ctx))}]"
+  }
+}
+
+object LoggerName {
+  def forClass(cls: Class[_]): String = {
+    val b = new StringBuilder
+    val parts = cls.getPackage.getName.split('.').map(p => p.charAt(0))
+    for (c <- parts) {
+      b.append(c)
+      b.append('.')
+    }
+    b.append(cls.getSimpleName)
+    b.toString
   }
 }

@@ -1,10 +1,14 @@
-package future.play.services
+package example.app.services
+
+import example.app.context.AuthCtx
+import example.app.models.{Permission, Role}
+
+import future.concurrent.ImplicitExecutionContext
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 
-import future.play.models.{AppCtx, Permission, Role}
-
-class RoleService(sctx: SvcCtx) extends BaseService(sctx) {
+class RoleService(executionContext: ExecutionContext) extends ImplicitExecutionContext(executionContext) {
 
   private val memberPerms: Set[Permission] = Set(
     Permission("CreateArticle"),
@@ -26,7 +30,7 @@ class RoleService(sctx: SvcCtx) extends BaseService(sctx) {
     Role("admin") -> adminPerms,
   )
 
-  def expandRoles(roles: Set[Role]): AppCtx.To[Future[Set[Permission]]] = {
+  def expandRoles(roles: Set[Role]): AuthCtx.To[Future[Set[Permission]]] = {
     Future.successful(roles.flatMap(role => permissionMap.getOrElse(role, Set.empty)))
   }
 }

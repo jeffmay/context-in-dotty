@@ -15,17 +15,5 @@ object Main {
     val goodRequest = Request("GET", "/fake", "Good Request")
     val result1 = exampleCtrl.returnOk.handle(goodRequest).!
     println(s"ok result: ${result1.status}")
-
-    val result2 = exampleCtrl.authenticated.handle(goodRequest).!
-    println(s"authenticated result: ${result2.status}")
-
-    val result3 = exampleCtrl.responder.handle(goodRequest).!
-    println(s"responder result: ${result3.body}")
-
-    val result4 = exampleCtrl.findUser.handle(goodRequest).!
-    println(s"findUser response: ${result4}")
-
-    val result5 = exampleCtrl.logging.handle(goodRequest).!
-    println(s"logging response: ${result5}")
   }
 }

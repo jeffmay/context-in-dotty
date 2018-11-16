@@ -15,21 +15,21 @@ import scala.util.Try
   "Missing implicit RequestCtx here. This model is extracted from the request by the controller " +
   "and passed along implicitly. Please include or define an implicit context in scope."
 )
-class RootCtxFromRequest(req: Request) 
+class BaseRequestContext(req: Request) 
   extends PlayRequestContext(req)
-  with RootCtx {
+  with RequestCtx {
   override lazy val correlationId: CorrelationId = CorrelationId.extractFromHeaderMap(request.headers)
   override lazy val maybeUserId: Option[Int] = request.headers.get("UserId").flatMap(v => Try(v.toInt).toOption)
 }
 
-sealed trait RootCtx extends PlayRequestContext with TraceCtx {
+sealed trait RequestCtx extends PlayRequestContext with TraceCtx {
   def request: Request
 }
 
-object RootCtx extends RequestContextCompanion[RootCtx] {
-  implicit val refine: RefineFrom[PlayRequestContext] = {
-    ContextRefiner.sync { implicit ctx =>
-      new RootCtxFromRequest(ctx.request)
+object RequestCtx extends RequestContextCompanion[RequestCtx] {
+  implicit val refine: RefineFrom[Request] = {
+    ContextRefiner.sync { implicit request =>
+      new BaseRequestContext(request)
     }
   }
 }
@@ -38,14 +38,14 @@ object RootCtx extends RequestContextCompanion[RootCtx] {
   "Missing implicit AuthCtx here. This model is extracted from the request by the controller " +
   "and passed along implicitly. Please include or define an implicit context in scope."
 )
-sealed trait AuthCtx extends RootCtx with DBCtx {
+sealed trait AuthCtx extends RequestCtx with DBCtx {
   def authenticatedUserId: Int
 }
 
 object AuthCtx extends RequestContextCompanion[AuthCtx] {
-  implicit val refine: RefineFrom[RootCtx] = ContextRefiner.syncOrRespond {
-    RootCtx.here.maybeUserId.map { userId =>
-      new AuthCtxFromRequest(RootCtx.here.request, userId)
+  implicit val refine: RefineFrom[RequestCtx] = ContextRefiner.syncOrRespond {
+    RequestCtx.here.maybeUserId.map { userId =>
+      new AuthCtxFromRequest(RequestCtx.here.request, userId)
     }.toRight(Response(401))
   }
 }
@@ -53,5 +53,5 @@ object AuthCtx extends RequestContextCompanion[AuthCtx] {
 class AuthCtxFromRequest(
   request: Request,
   override val authenticatedUserId: Int
-) extends RootCtxFromRequest(request) 
+) extends BaseRequestContext(request) 
   with AuthCtx

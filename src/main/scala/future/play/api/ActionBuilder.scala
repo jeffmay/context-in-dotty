@@ -7,20 +7,19 @@ import future.concurrent.ImplicitExecutionContext
 
 object ActionBuilder {
 
-  def apply(executionContext: ExecutionContext): ActionBuilder[PlayRequestContext] = {
+  def apply(executionContext: ExecutionContext): ActionBuilder[Request] = {
     implicit def ec: ExecutionContext = executionContext
-    new ActionBuilder[PlayRequestContext]
+    new ActionBuilder[Request]
   }
 }
 
 class ActionBuilder[BaseCtx](implicit 
-  refiner: ContextRefiner[PlayRequestContext, BaseCtx],
+  refiner: ContextRefiner[Request, BaseCtx],
   handlerContext: ExecutionContext
 ) extends ImplicitExecutionContext(handlerContext) {
   outer =>
 
-  def handle[R: Responder](block: implicit BaseCtx => R): Action = { request =>
-    implicit val playCtx: PlayRequestContext = new PlayRequestContext(request) {}
+  def handle[R: Responder](block: implicit BaseCtx => R): Action = Action {
     refiner.refineOrRespond().flatMap {
       case Right(ctx) =>
         implicit def c: BaseCtx = ctx

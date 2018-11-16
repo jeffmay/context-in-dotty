@@ -16,9 +16,6 @@ class ControllerModule(
   lazy val rootActionBuilder: ActionBuilder[RequestCtx] = playActionBuilder.refined[RequestCtx]
 
   lazy val exampleCtrl: ExampleController = new ExampleController(
-    rootActionBuilder,
-    new AppLogger(classOf[ExampleController]),
-    serviceModule.userService,
     executionModule.cpuBound
   )
 }

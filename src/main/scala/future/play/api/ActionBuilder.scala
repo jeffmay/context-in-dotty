@@ -7,6 +7,8 @@ import future.concurrent.ImplicitExecutionContext
 
 object ActionBuilder {
 
+  val global: ActionBuilder[Request] = apply(ExecutionContext.global)
+
   def apply(executionContext: ExecutionContext): ActionBuilder[Request] = {
     implicit def ec: ExecutionContext = executionContext
     new ActionBuilder[Request]

@@ -22,9 +22,9 @@ class BaseRequestContext(req: Request)
   override lazy val maybeUserId: Option[Int] = request.headers.get("UserId").flatMap(v => Try(v.toInt).toOption)
 }
 
-sealed trait RequestCtx extends PlayRequestContext with TraceCtx {
-  def request: Request
-}
+sealed trait RequestCtx
+  extends PlayRequestContext
+  with TraceCtx
 
 object RequestCtx extends RequestContextCompanion[RequestCtx] {
   implicit val refine: RefineFrom[Request] = {

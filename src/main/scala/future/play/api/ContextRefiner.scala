@@ -5,8 +5,11 @@ import future.concurrent.ExecuteOnCallingThread
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-trait ContextRefiner[-BaseCtx, +RefinedCtx] extends (BaseCtx => Future[Either[Response, RefinedCtx]]) {
-  def refineOrRespond()(implicit base: BaseCtx): Future[Either[Response, RefinedCtx]] = apply(base)
+trait ContextRefiner[-BaseCtx, +RefinedCtx]
+  extends (BaseCtx => Future[Either[Response, RefinedCtx]]) {
+  inline def refineOrRespond()(implicit base: BaseCtx): Future[Either[Response, RefinedCtx]] = {
+    apply(base)
+  }
 }
 
 object ContextRefiner {

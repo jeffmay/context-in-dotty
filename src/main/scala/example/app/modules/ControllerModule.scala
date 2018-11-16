@@ -13,9 +13,10 @@ class ControllerModule(
   serviceModule: ServiceModule
 ) {
 
-  lazy val rootActionBuilder: ActionBuilder[RequestCtx] = playActionBuilder.refined[RequestCtx]
+  lazy val requestActionBuilder: ActionBuilder[RequestCtx] = playActionBuilder.refined[RequestCtx]
 
   lazy val exampleCtrl: ExampleController = new ExampleController(
+    playActionBuilder,
     executionModule.cpuBound
   )
 }

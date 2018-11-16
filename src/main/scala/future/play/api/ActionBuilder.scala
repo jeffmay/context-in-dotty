@@ -7,6 +7,10 @@ import future.concurrent.ImplicitExecutionContext
 
 object ActionBuilder {
 
+  inline def here(implicit ec: ExecutionContext): ActionBuilder[Request] = {
+    new ActionBuilder[Request]
+  }
+
   val global: ActionBuilder[Request] = apply(ExecutionContext.global)
 
   def apply(executionContext: ExecutionContext): ActionBuilder[Request] = {
@@ -19,7 +23,6 @@ class ActionBuilder[BaseCtx](implicit
   refiner: ContextRefiner[Request, BaseCtx],
   handlerContext: ExecutionContext
 ) extends ImplicitExecutionContext(handlerContext) {
-  outer =>
 
   def handle[R: Responder](block: implicit BaseCtx => R): Action = Action {
     refiner.refineOrRespond().flatMap {
@@ -31,11 +34,11 @@ class ActionBuilder[BaseCtx](implicit
     }
   }
 
-  def refined[C](implicit refiner: ContextRefiner[BaseCtx, C]): ActionBuilder[C] = {
+  def refined[C](implicit nextRefiner: ContextRefiner[BaseCtx, C]): ActionBuilder[C] = {
     new ActionBuilder[C]()({ implicit playCtx =>
-      outer.refiner(playCtx).flatMap {
+      refiner(playCtx).flatMap {
         case Right(base) =>
-          refiner(base)
+          nextRefiner(base)
         case Left(response) =>
           Future.successful(Left(response))
       }

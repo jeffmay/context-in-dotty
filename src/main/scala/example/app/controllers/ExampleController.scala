@@ -11,10 +11,11 @@ import future.play.json._
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExampleController(
+  action: ActionBuilder[Request],
   ec: ExecutionContext
 ) extends ImplicitExecutionContext(ec) {
 
-  def returnOk = ActionBuilder(ec).handle {
+  def returnOk = action.handle {
     Response(200)
   }
 }

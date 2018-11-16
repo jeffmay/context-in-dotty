@@ -13,7 +13,7 @@ import future.concurrent.ImplicitExecutionContext
 
 class UserService(
   users: UserCollection,
-  logger: AppLogger,
+  logger: AppLogger[AuthCtx],
   ec: ExecutionContext
 ) extends ImplicitExecutionContext(ec) {
 

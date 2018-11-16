@@ -4,6 +4,7 @@ import example.tracing.context.TraceCtx
 import example.tracing.CorrelationId
 import example.database.context.DBCtx
 
+import future.logging.LoggableAsMap
 import future.context.ContextCompanion
 import future.play.api._
 
@@ -32,6 +33,14 @@ object RequestCtx extends RequestContextCompanion[RequestCtx] {
       new BaseRequestContext(request)
     }
   }
+
+  implicit val loggable: LoggableAsMap[RequestCtx] = { ctx =>
+    Map(
+      "path" -> ctx.request.path,
+      "userId" -> ctx.maybeUserId.map(_.toString).getOrElse("unauthenticated"),
+      "correlationId" -> ctx.correlationId.value
+    )
+  }
 }
 
 @implicitNotFound(
@@ -47,6 +56,10 @@ object AuthCtx extends RequestContextCompanion[AuthCtx] {
     RequestCtx.here.maybeUserId.map { userId =>
       new AuthCtxFromRequest(RequestCtx.here.request, userId)
     }.toRight(Response(401))
+  }
+
+  implicit val loggableAsMap: LoggableAsMap[AuthCtx] = { ctx =>
+    LoggableAsMap.write(ctx)
   }
 }
 

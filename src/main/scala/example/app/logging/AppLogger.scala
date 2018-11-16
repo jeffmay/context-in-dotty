@@ -1,16 +1,19 @@
 package example.app.logging
 
-import future.logging.{ContextLogger, LoggerName, MDCLogFormat}
+import future.logging._
 import example.app.context.RequestCtx
-import scala.reflect.ClassTag
+import scala.reflect.{classTag, ClassTag}
 
-class AppLogger(name: String) extends ContextLogger[RequestCtx](name) 
-  with MDCLogFormat[RequestCtx] {
+class AppLogger[Ctx: LoggableAsMap](name: String)
+  extends ContextLogger[Ctx](name)
+  with StandardLogFormat
+  with ContextMapFormat[Ctx] {
+
   def this(cls: Class[_]) = this(LoggerName.forClass(cls))
+}
 
-  override protected def extractMDC(ctx: RequestCtx): Map[String, String] = Map(
-    "path" -> ctx.request.path,
-    "userId" -> ctx.maybeUserId.map(_.toString).getOrElse("unauthenticated"),
-    "correlationId" -> ctx.correlationId.value
-  )
+object AppLogger {
+  inline def apply[T: LoggableAsMap: ClassTag]: AppLogger[T] = {
+    new AppLogger(classTag[T].runtimeClass)
+  }
 }
